@@ -12,8 +12,7 @@ contract AcroDAO {
     Executed,
     Cancelled,
     Expired,
-    Defeated,
-    Queued
+    Defeated
   }
 
   enum Support {
@@ -85,6 +84,7 @@ contract AcroDAO {
   // mappings
   mapping(uint256 => Proposal) public proposals;
   mapping(address => bool) public isMember;
+  mapping(address => uint256) public latestId;
 
   // constructor
   constructor() {
@@ -92,7 +92,7 @@ contract AcroDAO {
   }
 
   // functions
-  function quorumReached(uint256 proposalId) internal view returns (bool) {
+  function quorumReached(uint256 proposalId) public view returns (bool) {
     Proposal storage proposal = proposals[proposalId];
     uint256 quorumVotesCount = (QUORUM * members.length) / 100;
     if (proposal.votes.forVotes + proposal.votes.againstVotes >= quorumVotesCount) {
@@ -101,7 +101,7 @@ contract AcroDAO {
     return false;
   }
 
-  function voteSucceed(uint256 proposalId) internal view returns (bool) {
+  function voteSucceed(uint256 proposalId) public view returns (bool) {
     Proposal storage proposal = proposals[proposalId];
     if (proposal.votes.forVotes > proposal.votes.againstVotes) {
       return true;
@@ -121,11 +121,9 @@ contract AcroDAO {
     return isMember[_member];
   }
 
-  function returnProposalState(uint256 proposalId) internal view returns (ProposalState) {
+  function returnProposalState(uint256 proposalId) public view returns (ProposalState) {
     Proposal storage proposal = proposals[proposalId];
-    if (block.timestamp <= proposal.endTime) {
-      return ProposalState.Active;
-    } else if (quorumReached(proposalId) && voteSucceed(proposalId)) {
+    if (quorumReached(proposalId) && voteSucceed(proposalId)) {
       return ProposalState.Succesful;
     } else if (proposal.state == ProposalState.Cancelled) {
       return ProposalState.Cancelled;
@@ -134,7 +132,7 @@ contract AcroDAO {
     } else if (proposal.endTime < block.timestamp && !voteSucceed(proposalId)) {
       return ProposalState.Expired;
     } else {
-      return ProposalState.Pending;
+      return ProposalState.Active;
     }
   }
 
@@ -156,12 +154,14 @@ contract AcroDAO {
     string memory _description
   ) external membersOnly virtual returns (uint256) {
     uint256 proposalId = hashProposal(_targets, _values, _calldatas, keccak256(bytes(_description)));
-    require(_targets.length == _values.length, "invalid length");
-    require(_targets.length == _calldatas.length, "invalid length");
+    require(_targets.length == _values.length, "invalid values length");
+    require(_targets.length == _calldatas.length, "invalid calldata length");
     require(_targets.length > 0, "empty proposal");
     Proposal storage proposal = proposals[proposalId];
     require(proposal.startTime == 0, "already exist");
 
+    latestId[msg.sender] = proposalId;
+  
     proposal.propId = proposalId;
     proposal.proposer = msg.sender;
     proposal.targets = _targets;
@@ -208,7 +208,7 @@ contract AcroDAO {
 
   // execute the queued project
   function executeProposal(uint256 proposalId) external {
-    require(returnProposalState(proposalId) == ProposalState.Queued, "must queued");
+    require(returnProposalState(proposalId) == ProposalState.Succesful, "must successful");
     Proposal storage proposal = proposals[proposalId];
     proposal.state = ProposalState.Executed;
     for (uint256 i = 0; i < proposal.targets.length; i++) {
@@ -227,13 +227,6 @@ contract AcroDAO {
     Proposal storage proposal = proposals[proposalId];
     require(proposal.state != ProposalState.Executed, "already executed");
     proposal.state = ProposalState.Cancelled;
-  }
-
-  // queue the successful project
-  function queue(uint256 proposalId) external {
-    require(returnProposalState(proposalId) == ProposalState.Succesful, "should succeed");
-    Proposal storage proposal = proposals[proposalId];
-    proposal.state = ProposalState.Queued;
   }
 
   function getChainId() internal view returns (uint256) {
@@ -257,7 +250,7 @@ contract AcroDAO {
     bytes32 digest = keccak256(abi.encodePacked("\x19\x01", separator, structHash));
     address signer = ecrecover(digest, _v, _r, _s);
     require(signer != address(0), "invalid signature");
-    require(isMember[signer], "not member");
+    require(isMember[signer], "not a member");
     Receipt storage receipt = proposal.receipts[signer];
     require(!receipt.hasVoted, "already voted");
     if (support == uint8(Support.AGAINST)) {
