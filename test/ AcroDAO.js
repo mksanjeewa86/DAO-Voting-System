@@ -215,7 +215,7 @@ describe("Project", () => {
     });
   });
   describe("execute", () => {
-    it("sample", async () => {
+    it("should buy nft", async () => {
       let proposalId;
       let types;
       let domain;
@@ -228,12 +228,21 @@ describe("Project", () => {
       const accounts = await ethers.getSigners();
       const project = await deployDAO();
       const market = await deployMarketplace();
-      await market.connect(account1).addNftContract([
+
+      const deployProposal = async () => {
+        const contractFactory = await ethers.getContractFactory("Proposal", account1.address);
+        const contract = await contractFactory.deploy(market.address);
+        await contract.deployed();
+        return contract;
+      };
+      const proposalContract = await deployProposal();
+
+      await market.addNftContract([
         [0, parseEther("1")],
         [1, parseEther("2")],
       ]);
       const proposal = {
-        targets: [market.address],
+        targets: [proposalContract.address],
         values: [parseEther("1")],
         signatures: ["buyNft(uint256,uint256)"],
         calldatas: [abiCoder.encode(["uint256", "uint256"], [0, 0])],
@@ -276,7 +285,7 @@ describe("Project", () => {
       expect(abstainVotes).to.equal(0);
       clock.tick(ONE_DAY * 7);
       await project.executeProposal(proposalId);
-      expect(await market.getOwner(0, 0)).to.equal(account1.address);
+      expect(await market.getOwner(0, 0)).to.equal(proposalContract.address);
     });
   });
 });
