@@ -217,8 +217,6 @@ describe("Project", () => {
   describe("execute", () => {
     it("sample", async () => {
       let proposalId;
-      let proposalContract;
-      let marketplaceContract;
       let types;
       let domain;
       let clock;
@@ -228,14 +226,14 @@ describe("Project", () => {
       });
       const ONE_DAY = 60 * 1000 * 60 * 24;
       const accounts = await ethers.getSigners();
-      proposalContract = await deployDAO();
-      marketplaceContract = await deployMarketplace();
-      await marketplaceContract.connect(account1).addNftContract([
+      const project = await deployDAO();
+      const market = await deployMarketplace();
+      await market.connect(account1).addNftContract([
         [0, parseEther("1")],
         [1, parseEther("2")],
       ]);
       const proposal = {
-        targets: [proposalContract.address],
+        targets: [market.address],
         values: [parseEther("1")],
         signatures: ["buyNft(uint256,uint256)"],
         calldatas: [abiCoder.encode(["uint256", "uint256"], [0, 0])],

@@ -7,12 +7,10 @@ contract AcroDAO {
   // enumerations
   enum ProposalState {
     Active,
-    Pending,
     Succesful,
     Executed,
     Cancelled,
-    Expired,
-    Defeated
+    Expired
   }
 
   enum Support {
@@ -123,7 +121,7 @@ contract AcroDAO {
 
   function returnProposalState(uint256 proposalId) public view returns (ProposalState) {
     Proposal storage proposal = proposals[proposalId];
-    if (quorumReached(proposalId) && voteSucceed(proposalId)) {
+    if (proposal.endTime < block.timestamp && quorumReached(proposalId) && voteSucceed(proposalId)) {
       return ProposalState.Succesful;
     } else if (proposal.state == ProposalState.Cancelled) {
       return ProposalState.Cancelled;
