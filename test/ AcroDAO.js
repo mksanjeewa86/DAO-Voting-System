@@ -276,7 +276,7 @@ describe("Project", () => {
       expect(abstainVotes).to.equal(0);
       clock.tick(ONE_DAY * 7);
       await project.executeProposal(proposalId);
-      expect(await marketplaceContract.getOwner(0, 0)).to.equal(account1.address);
+      expect(await market.getOwner(0, 0)).to.equal(account1.address);
     });
   });
 });
